@@ -43,15 +43,16 @@ setting the `PREFIX` environment variable.
 To update ruby-build after it has been installed, run `git pull` in
 your cloned copy of the repository, then re-run the install script.
 
+After installation, the cloned ruby-build directory is not strictly
+required for future operation.
+
 ### Uninstalling as a standalone program (advanced)
 
-    $ git clone git://github.com/sstephenson/ruby-build.git
-    $ cd ruby-build
-    $ ./uninstall.sh
+    $ ruby-build-standalone-uninstall
 
-If a PREFIX environment variable was set for installation, be sure to set it prior to uninstalling as well.  It can also be done in one line without affecting the current environment like so:
+Or with a custom PREFIX:
 
-    $ PREFIX=/opt/ruby-build ./uninstall.sh
+    $ $PREFIX/ruby-standalone-build-uninstall
 
 ### Installing with Homebrew (for OS X users)
 
