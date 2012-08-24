@@ -1,4 +1,4 @@
-.PHONY: install
+.PHONY: install upgrade
 
 PREFIX      ?=/usr/local
 BIN_SUBDIR  ?=bin
@@ -13,7 +13,7 @@ BIN_DEST_FILES     =$(patsubst $(BIN_SUBDIR)/%,$(BIN_PREFIX)/%,$(BIN_SOURCE_FILE
 SHARE_DEST_FILES   =$(patsubst $(SHARE_SUBDIR)/%,$(SHARE_PREFIX)/%,$(SHARE_SOURCE_FILES))
 
 usage:	
-	echo "run either 'make install' or 'make uninstall'"
+	echo "run either 'make install' or 'make uninstall' or 'make upgrade'"
 
 clean:
 
@@ -31,3 +31,5 @@ $(SHARE_PREFIX)/%: $(SHARE_SUBDIR)/%
 uninstall: 
 	rm -rf "$(SHARE_PREFIX)"
 	rm -rf $(addsuffix ",$(addprefix ",$(BIN_DEST_FILES)))
+
+upgrade: uninstall install
