@@ -50,6 +50,8 @@ required for future operation.
 
     $ ruby-build-standalone-uninstall
 
+`sudo` may be required as with install.
+
 Or with a custom PREFIX:
 
     $ $PREFIX/ruby-standalone-build-uninstall
