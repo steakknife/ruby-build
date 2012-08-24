@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -E
+
+if [ -d .git ] || [ -d ../.git ]
+then
+    PREFIX="${PREFIX:-/usr/local}" # repo copy
+else
+    PREFIX="$(dirname $0)" # installed copy
+fi
+
+BIN_PREFIX="${BIN_PREFIX:-${PREFIX}/bin}"
+SHARE_PREFIX="${SHARE_PREFIX:-${PREFIX}/share/ruby-build}"
+
+rm -f  "${BIN_PREFIX}/ruby-build"      \
+       "${BIN_PREFIX}/rbenv-uninstall" \
+       "${BIN_PREFIX}/rbenv-install" 
+
+rm -rf "${SHARE_PREFIX}"
+
+rm -f  "${BIN_PREFIX}/ruby-build-standalone-uninstall"
