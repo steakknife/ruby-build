@@ -46,6 +46,12 @@ your cloned copy of the repository, then re-run the install script.
 After installation, the cloned ruby-build directory is not strictly
 required for future operation.
 
+### Upgrading as a standalone program (advanced)
+
+    $ ruby-build-upgrade
+
+`sudo` may be required as with install.
+
 ### Uninstalling as a standalone program (advanced)
 
     $ ruby-build-standalone-uninstall
