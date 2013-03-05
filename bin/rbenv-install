@@ -1,4 +1,21 @@
 #!/usr/bin/env bash
+#
+# Summary: Install a Ruby version using the ruby-build plugin
+#
+# Usage: rbenv install [-f|--force] [-k|--keep] [-v|--verbose] <version>
+#        rbenv install [-f|--force] [-k|--keep] [-v|--verbose] <definition-file>
+#        rbenv install -l|--list
+#
+#   -l/--list        List all available versions
+#   -f/--force       Install even if the version appears to be installed already
+#   -k/--keep        Keep source tree in $RBENV_BUILD_ROOT after installation
+#                    (defaults to $RBENV_ROOT/sources)
+#   -v/--verbose     Verbose mode: print compilation status to stdout
+#
+# For detailed information on installing Ruby versions with
+# ruby-build, including a list of environment variables for adjusting
+# compilation, see: https://github.com/sstephenson/ruby-build#usage
+#
 set -e
 [ -n "$RBENV_DEBUG" ] && set -x
 
@@ -15,20 +32,12 @@ fi
 eval "$(ruby-build --lib)"
 
 usage() {
-  { echo "usage: rbenv install [-k|--keep] [-v|--verbose] VERSION"
-    echo "       rbenv install [-k|--keep] [-v|--verbose] /path/to/definition"
-    echo "       rbenv install -l|--list"
-    echo
-    echo "  -l/--list        List all available versions"
-    echo "  -k/--keep        Keep source tree in \$RBENV_BUILD_ROOT after installation"
-    echo "                   (defaults to ${RBENV_ROOT}/sources)"
-    echo "  -v/--verbose     Verbose mode: print compilation status to stdout"
-    echo
-  } >&2
-
+  # We can remove the sed fallback once rbenv 0.4.0 is widely available.
+  rbenv-help install 2>/dev/null || sed -ne '/^#/!q;s/.//;s/.//;1,4d;p' < "$0"
   [ -z "$1" ] || exit "$1"
 }
 
+unset FORCE
 unset KEEP
 unset VERBOSE
 
@@ -42,6 +51,9 @@ for option in "${OPTIONS[@]}"; do
     echo "Available versions:"
     ruby-build --definitions | sed 's/^/  /'
     exit
+    ;;
+  "f" | "force" )
+    FORCE=true
     ;;
   "k" | "keep" )
     [ -n "${RBENV_BUILD_ROOT}" ] || RBENV_BUILD_ROOT="${RBENV_ROOT}/sources"
@@ -58,21 +70,93 @@ for option in "${OPTIONS[@]}"; do
   esac
 done
 
+unset VERSION_NAME
+
+# The first argument contains the definition to install. If the
+# argument is missing, try to install whatever local app-specific
+# version is specified by rbenv. Show usage instructions if a local
+# version is not specified.
 DEFINITION="${ARGUMENTS[0]}"
+[ -n "$DEFINITION" ] || DEFINITION="$(rbenv local 2>/dev/null || true)"
 [ -n "$DEFINITION" ] || usage 1
 
+
+# Define `before_install` and `after_install` functions that allow
+# plugin hooks to register a string of code for execution before or
+# after the installation process.
+declare -a before_hooks after_hooks
+
+before_install() {
+  local hook="$1"
+  before_hooks["${#before_hooks[@]}"]="$hook"
+}
+
+after_install() {
+  local hook="$1"
+  after_hooks["${#after_hooks[@]}"]="$hook"
+}
+
+# Load plugin hooks.
 for script in $(rbenv-hooks install); do
   source "$script"
 done
 
-VERSION_NAME="${DEFINITION##*/}"
+
+# Set VERSION_NAME from $DEFINITION, if it is not already set. Then
+# compute the installation prefix.
+[ -n "$VERSION_NAME" ] || VERSION_NAME="${DEFINITION##*/}"
 PREFIX="${RBENV_ROOT}/versions/${VERSION_NAME}"
 
-# If RBENV_BUILD_ROOT is set, then always pass keep options to ruby-build
+[ -d "${PREFIX}" ] && PREFIX_EXISTS=1
+
+# If the installation prefix exists, prompt for confirmation unless
+# the --force option was specified.
+if [ -z "$FORCE" ] && [ -d "${PREFIX}/bin" ]; then
+  echo "rbenv: $PREFIX already exists" >&2
+  read -p "continue with installation? (y/N) "
+
+  case "$REPLY" in
+  y* | Y* ) ;;
+  * ) exit 1 ;;
+  esac
+fi
+
+# If RBENV_BUILD_ROOT is set, always pass keep options to ruby-build.
 if [ -n "${RBENV_BUILD_ROOT}" ]; then
   export RUBY_BUILD_BUILD_PATH="${RBENV_BUILD_ROOT}/${VERSION_NAME}"
   KEEP="-k"
 fi
 
-ruby-build $KEEP $VERBOSE "$DEFINITION" "$PREFIX"
-rbenv rehash
+# Set RUBY_BUILD_CACHE_PATH to $RBENV_ROOT/cache, if the directory
+# exists and the variable is not already set.
+if [ -z "${RUBY_BUILD_CACHE_PATH}" ] && [ -d "${RBENV_ROOT}/cache" ]; then
+  export RUBY_BUILD_CACHE_PATH="${RBENV_ROOT}/cache"
+fi
+
+
+# Execute `before_install` hooks.
+for hook in "${before_hooks[@]}"; do eval "$hook"; done
+
+# Plan cleanup on unsuccessful installation.
+cleanup() {
+  [ -z "${PREFIX_EXISTS}" ] && rm -rf "$PREFIX"
+}
+
+trap cleanup SIGINT
+
+# Invoke `ruby-build` and record the exit status in $STATUS. Run
+# `rbenv rehash` after a successful installation.
+STATUS=0
+ruby-build $KEEP $VERBOSE "$DEFINITION" "$PREFIX" || STATUS="$?"
+
+# Execute `after_install` hooks.
+for hook in "${after_hooks[@]}"; do eval "$hook"; done
+
+# Run `rbenv-rehash` after a successful installation.
+if [ "$STATUS" == "0" ]; then
+  rbenv rehash
+else
+  cleanup
+fi
+
+exit "$STATUS"
